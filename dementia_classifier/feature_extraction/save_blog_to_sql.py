@@ -1,7 +1,6 @@
 from sqlalchemy import create_engine
 import pandas as pd
-from itertools import chain
-from dementia_classifier.feature_extraction.feature_sets import pos_phrases, pos_syntactic, psycholinguistic, acoustic, discourse
+from dementia_classifier.feature_extraction.feature_sets import pos_phrases, pos_syntactic, psycholinguistic, acoustic
 from dementia_classifier.preprocess import get_data
 from dementia_classifier.settings import SQL_BLOG_SUFFIX, SQL_BLOG_QUALITY
 # ======================

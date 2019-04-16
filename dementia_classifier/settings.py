@@ -30,17 +30,13 @@ SQL_DBANK_TEXT_FEATURES = "dementiabank_text_features"
 SQL_DBANK_DIAGNOSIS = "dementiabank_diagnosis"
 SQL_DBANK_DEMOGRAPHIC = "dementiabank_demographic"
 SQL_DBANK_ACOUSTIC_FEATURES = "dementiabank_acoustic_features"
-SQL_DBANK_DISCOURSE_FEATURES = "dementiabank_discourse_features"
 
 # Blogs
 SQL_BLOG_SUFFIX = 'text_features'
 SQL_BLOG_QUALITY = 'blog_quality'
 
 # Results 
-DOMAIN_ADAPTATION_RESULTS_PREFIX = 'results_domain_adaptation'
-ABLATION_RESULTS_PREFIX = 'results_ablation'
 NEW_FEATURES_RESULTS_PREFIX = 'results_new_features'
 BLOG_RESULTS = 'results_blog'
-BLOG_ABLATION_PREFIX = 'results_blog_ablation'
 
 PARSER_MAX_LENGTH = 50

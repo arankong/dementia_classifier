@@ -3,9 +3,8 @@ import pandas as pd
 import numpy as np
 import itertools
 from sklearn.model_selection import GroupKFold
-from sklearn.utils import shuffle
 from dementia_classifier.feature_extraction.feature_sets import feature_set_list
-from dementia_classifier.settings import SQL_DBANK_TEXT_FEATURES, SQL_DBANK_DIAGNOSIS, SQL_DBANK_DEMOGRAPHIC, SQL_DBANK_ACOUSTIC_FEATURES, SQL_DBANK_DISCOURSE_FEATURES
+from dementia_classifier.settings import SQL_DBANK_TEXT_FEATURES, SQL_DBANK_DIAGNOSIS, SQL_DBANK_DEMOGRAPHIC, SQL_DBANK_ACOUSTIC_FEATURES
 # --------MySql---------
 from dementia_classifier import db
 cnx = db.get_connection()
@@ -13,8 +12,6 @@ cnx = db.get_connection()
 
 ALZHEIMERS     = ["PossibleAD", "ProbableAD"]
 CONTROL        = ["Control"]
-MCI            = ["MCI"]
-NON_ALZHEIMERS = ["MCI", "Memory", "Other", "Vascular"]
 CONTROL_BLOGS  = ["earlyonset", "helpparentsagewell", "journeywithdementia"]
 DEMENTIA_BLOGS = ["creatingmemories", "living-with-alzhiemers", "parkblog-silverfox"]
 
@@ -40,7 +37,6 @@ def get_data(diagnosis=ALZHEIMERS + CONTROL, drop_features=None, polynomial_term
     text = pd.read_sql_table(SQL_DBANK_TEXT_FEATURES, cnx)
     demo = pd.read_sql_table(SQL_DBANK_DEMOGRAPHIC, cnx)
     diag = pd.read_sql_table(SQL_DBANK_DIAGNOSIS, cnx)
-    disc = pd.read_sql_table(SQL_DBANK_DISCOURSE_FEATURES, cnx)
     acoustic = pd.read_sql_table(SQL_DBANK_ACOUSTIC_FEATURES, cnx)
 
     # Add diagnosis
@@ -50,8 +46,6 @@ def get_data(diagnosis=ALZHEIMERS + CONTROL, drop_features=None, polynomial_term
     fv = pd.merge(fv, acoustic, on=['interview'])
     # Add demographics
     fv = pd.merge(fv, demo)
-    # Add discourse
-    fv = pd.merge(fv, disc, on=['interview'])
 
     # Randomize
     fv = fv.sample(frac=1, random_state=20)
@@ -91,44 +85,6 @@ def make_polynomial_terms(data, cols):
 
     return data
 
-
-def get_target_source_data(random_state=1):
-    # Get data
-    feature_set = feature_set_list.new_features()
-
-    X_alz, y_alz, l_alz = get_data(diagnosis=ALZHEIMERS, drop_features=feature_set)
-    X_con, y_con, l_con = get_data(diagnosis=CONTROL, drop_features=feature_set)
-    X_mci, y_mci, l_mci = get_data(diagnosis=MCI, drop_features=feature_set)
-
-    # Split control samples into target/source set (making sure one patient doesn't appear in both t and s)
-    gkf = GroupKFold(n_splits=6).split(X_con, y_con, groups=l_con)
-    source, target = gkf.next()
-    Xt, yt = concat_and_shuffle(X_mci, y_mci, l_mci, X_con.ix[target], y_con.ix[target], np.array(l_con)[target], random_state=random_state)
-    Xs, ys = concat_and_shuffle(X_alz, y_alz, l_alz, X_con.ix[source], y_con.ix[source], np.array(l_con)[source], random_state=random_state)
-
-    return Xt, yt, Xs, ys
-
-
-def concat_and_shuffle(X1, y1, l1, X2, y2, l2, random_state=1):
-    pd.options.mode.chained_assignment = None  # default='warn'
-    # Coerce all arguments to dataframes
-    X1, X2 = pd.DataFrame(X1), pd.DataFrame(X2)
-    y1, y2 = pd.DataFrame(y1), pd.DataFrame(y2)
-    l1, l2 = pd.DataFrame(l1), pd.DataFrame(l2)
-
-    X_concat = X1.append(X2, ignore_index=True)
-    y_concat = y1.append(y2, ignore_index=True)
-    l_concat = l1.append(l2, ignore_index=True)
-
-    X_shuf, y_shuf, l_shuf = shuffle(X_concat, y_concat, l_concat, random_state=random_state)
-
-    X_shuf['labels'] = l_shuf
-    y_shuf['labels'] = l_shuf
-
-    X_shuf.set_index('labels', inplace=True)
-    y_shuf.set_index('labels', inplace=True)
-
-    return X_shuf, y_shuf
 
 # ===================================================================================
 # ----------------------------------BlogData-----------------------------------------

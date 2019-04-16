@@ -1,10 +1,9 @@
 from sqlalchemy import create_engine
 import pandas as pd
-from itertools import chain
-from dementia_classifier.feature_extraction.feature_sets import pos_phrases, pos_syntactic, psycholinguistic, acoustic, discourse
+from dementia_classifier.feature_extraction.feature_sets import pos_phrases, pos_syntactic, psycholinguistic, acoustic
 from dementia_classifier.preprocess import get_data
 from dementia_classifier import settings
-from dementia_classifier.settings import SQL_DBANK_TEXT_FEATURES, SQL_DBANK_DIAGNOSIS, SQL_DBANK_DEMOGRAPHIC, SQL_DBANK_ACOUSTIC_FEATURES, SQL_DBANK_DISCOURSE_FEATURES
+from dementia_classifier.settings import SQL_DBANK_TEXT_FEATURES, SQL_DBANK_DIAGNOSIS, SQL_DBANK_DEMOGRAPHIC, SQL_DBANK_ACOUSTIC_FEATURES
 # ======================
 # setup mysql connection
 # ----------------------
@@ -82,31 +81,11 @@ def save_acoustic():
     feat_df.to_sql(SQL_DBANK_ACOUSTIC_FEATURES, cnx, if_exists='replace', index=False)
 
 
-def save_discourse():
-    # Extract control discourse features
-    control  = discourse.get_all(settings.DISCOURSE_CONTROL_DATA_PATH)
-    df_control = pd.DataFrame.from_dict(control, orient="index")
-
-    # Extract dementia discourse features
-    dementia  = discourse.get_all(settings.DISCOURSE_DEMENTIA_DATA_PATH)
-    df_dementia = pd.DataFrame.from_dict(dementia, orient="index")
-
-    # Merge dfs
-    feat_df = pd.concat([df_dementia, df_control])
-
-    # Save interview field for joins
-    feat_df["interview"] = feat_df.index
-    feat_df['interview'] = feat_df['interview'] + 'c'  # So it's consistent with sound files
-
-    # Save to sql
-    feat_df.to_sql(SQL_DBANK_DISCOURSE_FEATURES, cnx, if_exists='replace', index=False)
-
-
 def save_all_to_sql():
     # Save all dementiabank_text_features
-    save_dementiabank_text_features()
-    save_acoustic()
-    save_discourse()
     save_diagnosis()
     save_demographic()
+    save_dementiabank_text_features()
+    save_acoustic()
+
 
