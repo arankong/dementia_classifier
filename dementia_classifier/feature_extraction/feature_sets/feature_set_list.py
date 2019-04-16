@@ -288,50 +288,6 @@ def acoustics_features():
     ]
 
 
-def discourse_features():
-    return [
-        "Comparison",
-        "edu_rate",
-        "Topic-Change",
-        "Summary",
-        "Topic-Comment",
-        "Same-Unit",
-        "Evaluation",
-        "Contrast",
-        "Elaboration",
-        "Attribution",
-        "TextualOrganization",
-        "Cause",
-        "Explanation",
-        "Enablement",
-        "Joint",
-        "depth",
-        "Background",
-        "Temporal",
-        "Condition",
-        "Manner-Means",
-        "Comparison_ratio",
-        "Topic-Change_ratio",
-        "Summary_ratio",
-        "Topic-Comment_ratio",
-        "Same-Unit_ratio",
-        "Evaluation_ratio",
-        "Contrast_ratio",
-        "Elaboration_ratio",
-        "Attribution_ratio",
-        "TextualOrganization_ratio",
-        "Cause_ratio",
-        "Explanation_ratio",
-        "Enablement_ratio",
-        "Joint_ratio",
-        "Background_ratio",
-        "Temporal_ratio",
-        "Condition_ratio",
-        "Manner-Means_ratio",
-        'discourse_type_token_ratio',
-    ]
-
-
 def parts_of_speech_features():
     return [
         "NumNouns",
