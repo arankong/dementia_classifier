@@ -6,9 +6,9 @@ _connection = None
 def get_connection():
     global _connection
     if not _connection:
-        USER   = 'dementia'
-        PASSWD = 'Dementia123!'
-        DB     = 'masters_data'
+        USER   = 'patata'
+        PASSWD = 'carota'
+        DB     = 'dementia_data'
         url = 'mysql://%s:%s@localhost/%s' % (USER, PASSWD, DB)
         engine = create_engine(url)
         _connection = engine.connect()
