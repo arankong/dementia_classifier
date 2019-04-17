@@ -1,5 +1,6 @@
 # dementia_classifier
-Code for my masters thesis. The baseline methods were implemented by Vaden Masrani (https://github.com/vmasrani/dementia_classifier), a current PhD student at UBC. To run: 
+
+Code for experiments in Chapter 4 and Chapter 5 of my masters thesis. The baseline methods were implemented by Vaden Masrani (https://github.com/vmasrani/dementia_classifier), a current PhD student at UBC. To run: 
 - Request access to the [DementiaBank dataset](https://dementia.talkbank.org) from either Davida Fromm: fromm@andrew.cmu.edu or Brian MacWhinney: macw@cmu.edu  
 - Once you have permission, email me at kongw@alumni.ubc.ca to get a copy of the preprocessed dataset.
     -  Place data alongside run.py.
