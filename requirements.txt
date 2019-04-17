@@ -12,4 +12,4 @@ features==0.5.8
 scikit_learn==0.19.1
 python-speech-features==0.6
 MySQL-python==1.2.5
-
+pytorch==0.4.1
