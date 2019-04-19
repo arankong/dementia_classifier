@@ -78,7 +78,7 @@ class DementiaCV(object):
             nfeats = X_train.shape[1]
             feats = util.get_top_pearson_features(X_train, y_train, nfeats)
             if k_range is None:
-                k_range = range(1, nfeats)
+                k_range = range(1, nfeats+1)
             if k_range[0] == 0:
                 raise ValueError("k_range cannot start with 0")
             for k in k_range:
