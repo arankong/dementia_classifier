@@ -30,6 +30,8 @@ SQL_DBANK_TEXT_FEATURES = "dementiabank_text_features"
 SQL_DBANK_DIAGNOSIS = "dementiabank_diagnosis"
 SQL_DBANK_DEMOGRAPHIC = "dementiabank_demographic"
 SQL_DBANK_ACOUSTIC_FEATURES = "dementiabank_acoustic_features"
+SQL_DBANK_TEXT_EMBEDDINGS = "dementiabank_text_embedded"
+SQL_DBANK_ACOUSTIC_EMBEDDINGS = "dementiabank_acoustic_embedded"
 
 # Blogs
 SQL_BLOG_SUFFIX = 'text_features'
