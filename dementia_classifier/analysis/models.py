@@ -9,12 +9,12 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.naive_bayes import GaussianNB
 
 CLASSIFIERS = {
-    "DummyClassifier": DummyClassifier("most_frequent"),
+    # "DummyClassifier": DummyClassifier("most_frequent"),
     "LogReg": LogisticRegression(),
-    "KNeighbors": KNeighborsClassifier(),
-    "RandomForest": RandomForestClassifier(max_depth=3, n_jobs=1, n_estimators=100),
-    "GausNaiveBayes": GaussianNB(),
-    "SVC": SVC(probability=True),
+    # "KNeighbors": KNeighborsClassifier(),
+    # "RandomForest": RandomForestClassifier(max_depth=3, n_jobs=1, n_estimators=100),
+    # "GausNaiveBayes": GaussianNB(),
+    # "SVC": SVC(probability=True),
 }
 
 
@@ -33,13 +33,14 @@ CLASSIFIER_SET_2 = [
 
 # Ordered
 CLASSIFIER_KEYS = [
-    "DummyClassifier",
+    # "DummyClassifier",
     "LogReg",
-    "SVC",
-    "KNeighbors",
-    "RandomForest",
+    # "SVC",
+    # "KNeighbors",
+    # "RandomForest",
     # "MLP",
-    "GausNaiveBayes"]
+    # "GausNaiveBayes"
+    ]
 
 # Feature set
 FEATURE_SETS = [
@@ -52,13 +53,13 @@ FEATURE_SETS = [
     "demographic",
     "parts_of_speech",
     "information_content",
-]
-
-NEW_FEATURE_SETS = [
     "strips",
     "halves",
     "quadrant",
-    "discourse",
+]
+
+NEW_FEATURE_SETS = [
+
 ]
 
 BLOG_FEATURE_SETS = [
