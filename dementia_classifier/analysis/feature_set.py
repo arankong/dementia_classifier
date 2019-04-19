@@ -14,19 +14,19 @@ cnx = db.get_connection()
 # =================================================================
 # ----------------------Save results to sql------------------------
 # =================================================================
-def save_selected_feature_results_to_sql(selected_feature_sets, polynomial_terms=None):
-    
+def save_selected_feature_results_to_sql(selected_feature_sets):
+    name, features = selected_feature_sets
+
     full_feature_set = models.FEATURE_SETS
-    new_feature_set = models.NEW_FEATURE_SETS
-    new_feature_set.append('none')
+    new_feature_set = ['none']
 
     classifiers  = models.CLASSIFIERS
 
-    prefix = "results_selected_features"
+    prefix = "results_%s" % name
 
-    unselected_feature_sets = [f for f in full_feature_set if f not in selected_feature_sets]
+    unselected_feature_sets = [f for f in full_feature_set if f not in features]
 
-    if "halves" in selected_feature_sets:
+    if "halves" in features:
         polynomial_terms = feature_set_list.halves_features()
     else:
         polynomial_terms = None
@@ -59,9 +59,8 @@ def save_selected_feature_results_to_sql(selected_feature_sets, polynomial_terms
         elif feature_set == "quadrant":
             to_drop += feature_set_list.quadrant_features()
 
-    # to_drop += feature_set_list.coherence_score()
     for feature_set in new_feature_set:
-        print 'Saving new feature: %s' % feature_set
+        print 'Saving features: %s' % name
         X, y, labels = data_handler.get_data(drop_features=to_drop, polynomial_terms=polynomial_terms)
         print "Number of features used: ",len(X.values[0])
         trained_models = {model: DementiaCV(classifiers[model], X=X, y=y, labels=labels).train_model('default') for model in classifiers}
@@ -95,8 +94,8 @@ def save_models_to_sql_helper(trained_models, prefix, if_exists='replace'):
 # =================================================================
 
 
-def get_selected_feature_results(model, metric):
-    name = "results_selected_features"
+def get_selected_feature_results(model, metric, name):
+    name = "results_%s" % name
     nfs = pd.read_sql_table(name, cnx, index_col='index')
     nfs = nfs[(nfs.metric == metric) & (nfs.model == model)].dropna(axis=1)
     max_nfs_k = nfs.mean().argmax()
@@ -113,11 +112,12 @@ def get_selected_feature_results(model, metric):
 # ------------------------- Get results ----------------------------
 # ================================================================
 
-def selected_feature_set_result(metric='acc', show=False):
-    print "Plotting new_feature_set_plot, metric: %s" % metric
+def selected_feature_set_result(metric, feature_sets):
+    name, _ = feature_sets
+    print "Getting results of %s, metric: %s" % (name, metric)
     classifiers = list(models.CLASSIFIER_KEYS)
 
     for fs in ['none']:
         for classifier in classifiers:
-            df = get_selected_feature_results(classifier, metric)
+            df = get_selected_feature_results(classifier, metric, name)
             util.print_ci_from_df(df['folds'], fs, classifier)

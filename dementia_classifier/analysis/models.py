@@ -58,9 +58,6 @@ FEATURE_SETS = [
     "quadrant",
 ]
 
-NEW_FEATURE_SETS = [
-
-]
 
 BLOG_FEATURE_SETS = [
     "cfg",
