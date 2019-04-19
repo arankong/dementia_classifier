@@ -514,6 +514,13 @@ def new_features():
     new += quadrant_features()
     return new
 
+def task_specific_features():
+    new = []
+    new += halves_features()
+    new += strips_features()
+    new += quadrant_features()
+    new += information_content_features()
+    return new
 
 def make_polynomial_names(cols):
     names = []
