@@ -4,7 +4,7 @@ import numpy as np
 import itertools
 from sklearn.model_selection import GroupKFold
 from dementia_classifier.feature_extraction.feature_sets import feature_set_list
-from dementia_classifier.settings import SQL_DBANK_TEXT_FEATURES, SQL_DBANK_DIAGNOSIS, SQL_DBANK_DEMOGRAPHIC, SQL_DBANK_ACOUSTIC_FEATURES
+from dementia_classifier.settings import SQL_DBANK_TEXT_FEATURES, SQL_DBANK_DIAGNOSIS, SQL_DBANK_DEMOGRAPHIC, SQL_DBANK_ACOUSTIC_FEATURES, SQL_DBANK_TEXT_EMBEDDINGS, SQL_DBANK_ACOUSTIC_EMBEDDINGS
 # --------MySql---------
 from dementia_classifier import db
 cnx = db.get_connection()
@@ -39,6 +39,9 @@ def get_data(diagnosis=ALZHEIMERS + CONTROL, drop_features=None, polynomial_term
     diag = pd.read_sql_table(SQL_DBANK_DIAGNOSIS, cnx)
     acoustic = pd.read_sql_table(SQL_DBANK_ACOUSTIC_FEATURES, cnx)
 
+    text_embeddings = pd.read_sql_table(SQL_DBANK_TEXT_EMBEDDINGS, cnx)
+    acoustic_embeddings = pd.read_sql_table(SQL_DBANK_ACOUSTIC_EMBEDDINGS, cnx)
+
     # Add diagnosis
     diag = diag[diag['diagnosis'].isin(diagnosis)]
     fv = pd.merge(text, diag)
@@ -47,6 +50,8 @@ def get_data(diagnosis=ALZHEIMERS + CONTROL, drop_features=None, polynomial_term
     # Add demographics
     fv = pd.merge(fv, demo)
 
+    fv = pd.merge(fv, text_embeddings)
+    fv = pd.merge(fv, acoustic_embeddings)
     # Randomize
     fv = fv.sample(frac=1, random_state=20)
 

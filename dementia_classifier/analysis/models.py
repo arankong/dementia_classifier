@@ -56,6 +56,8 @@ FEATURE_SETS = [
     "strips",
     "halves",
     "quadrant",
+    "text_embeddings",
+    "acoustic_embeddings",
 ]
 
 

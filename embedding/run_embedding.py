@@ -6,7 +6,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from sklearn.model_selection import GroupKFold
-from dementia_classifier.settings import SQL_DBANK_TEXT_FEATURES, SQL_DBANK_DIAGNOSIS, SQL_DBANK_ACOUSTIC_FEATURES
+from dementia_classifier.settings import SQL_DBANK_TEXT_FEATURES, SQL_DBANK_DIAGNOSIS, SQL_DBANK_ACOUSTIC_FEATURES, SQL_DBANK_TEXT_EMBEDDINGS, SQL_DBANK_ACOUSTIC_EMBEDDINGS
 from dementia_classifier.feature_extraction.feature_sets.feature_set_list import task_specific_features
 # --------MySql---------
 from dementia_classifier import db
@@ -177,16 +177,22 @@ def train(text_lr, acoustic_lr, num_epochs):
 	
 	print "Saving embeddings on test fold as features..."
 	text_frame = pd.DataFrame(text_nparrays)
-	text_frame.rename(columns={0: "interview"}, inplace=True)
+	text_rename = {0: "interview"}
+	for i in range(1, 51):
+		text_rename[i] = "t%d" % i
+	text_frame.rename(columns=text_rename, inplace=True)
 
 	acoustic_frame = pd.DataFrame(acoustic_nparrays)
-	acoustic_frame.rename(columns={0: "interview"}, inplace=True)
+	acoustic_rename = {0: "interview"}
+	for i in range(1, 51):
+		acoustic_rename[i] = "a%d" % i
+	acoustic_frame.rename(columns=acoustic_rename, inplace=True)
 
-	text_frame.to_sql("dementiabank_text_embedded", cnx, if_exists='replace', index=False)
-	acoustic_frame.to_sql("dementiabank_acoustic_embedded", cnx, if_exists='replace', index=False)
+	text_frame.to_sql(SQL_DBANK_TEXT_EMBEDDINGS, cnx, if_exists='replace', index=False)
+	acoustic_frame.to_sql(SQL_DBANK_ACOUSTIC_EMBEDDINGS, cnx, if_exists='replace', index=False)
 
 def save_embedding_features():
-	num_epochs = 10
+	num_epochs = 1
 	text_lr = 0.01
 	acoustic_lr = 0.01
 

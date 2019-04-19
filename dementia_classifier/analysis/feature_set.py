@@ -58,6 +58,10 @@ def save_selected_feature_results_to_sql(selected_feature_sets):
             to_drop += feature_set_list.halves_features()
         elif feature_set == "quadrant":
             to_drop += feature_set_list.quadrant_features()
+        elif feature_set == "text_embeddings":
+            to_drop += feature_set_list.text_embeddings()
+        elif feature_set == "acoustic_embeddings":
+            to_drop += feature_set_list.acoustic_embeddings()
 
     for feature_set in new_feature_set:
         print 'Saving features: %s' % name
