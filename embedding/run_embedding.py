@@ -6,10 +6,12 @@ from torch import nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from sklearn.model_selection import GroupKFold
-from dementia_classifier.settings import SQL_DBANK_TEXT_FEATURES, SQL_DBANK_DIAGNOSIS, SQL_DBANK_ACOUSTIC_FEATURES, SQL_DBANK_TEXT_EMBEDDINGS, SQL_DBANK_ACOUSTIC_EMBEDDINGS
+from dementia_classifier.settings import SQL_DBANK_TEXT_FEATURES, SQL_DBANK_DIAGNOSIS, SQL_DBANK_ACOUSTIC_FEATURES
 from dementia_classifier.feature_extraction.feature_sets.feature_set_list import task_specific_features
 # --------MySql---------
 from dementia_classifier import db
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import f1_score, accuracy_score
 cnx = db.get_connection()
 
 ALZHEIMERS     = ["PossibleAD", "ProbableAD"]
@@ -82,15 +84,13 @@ class EmbeddingLayer(torch.nn.Module):
         return self.linear(x)
 
 
-# Save embeddings on test fold as features
-def embed_test_fold(text_encoder, acoustic_encoder, text_test, acoustic_test, interviews):
-	length = len(text_test)
+def get_data_frames(diag, text_encoder, acoustic_encoder, text, acoustic, interviews):
+	length = len(text)
 	text_features_embedded = np.zeros((length, 50))
 	acoustic_features_embedded = np.zeros((length, 50))
-
 	for i in range(length):
-		ti = Variable(torch.from_numpy(text_test[i]).float())
-		ai = Variable(torch.from_numpy(acoustic_test[i]).float())
+		ti = Variable(torch.from_numpy(text[i]).float())
+		ai = Variable(torch.from_numpy(acoustic[i]).float())
 
 		ti_embedded = text_encoder(ti)
 		ai_embedded = acoustic_encoder(ai)
@@ -98,18 +98,69 @@ def embed_test_fold(text_encoder, acoustic_encoder, text_test, acoustic_test, in
 		text_features_embedded[i, :] = ti_embedded.detach().numpy()
 		acoustic_features_embedded[i, :] = ai_embedded.detach().numpy()
 
-	interview = np.reshape(interviews, (length,-1))
-	text_nparray = np.hstack((interview, text_features_embedded))
-	acoustic_nparray = np.hstack((interview, acoustic_features_embedded))
+	interviews = np.reshape(interviews, (length,-1))
+	text_nparray = np.hstack((interviews, text_features_embedded))
+	acoustic_nparray = np.hstack((interviews, acoustic_features_embedded))
 
-	return text_nparray, acoustic_nparray
+	text_frame = pd.DataFrame(text_nparray)
+	text_rename = {0: "interview"}
+	for i in range(1, 51):
+		text_rename[i] = "t%d" % i
+	text_frame.rename(columns=text_rename, inplace=True)
+
+	acoustic_frame = pd.DataFrame(acoustic_nparray)
+	acoustic_rename = {0: "interview"}
+	for i in range(1, 51):
+		acoustic_rename[i] = "a%d" % i
+	acoustic_frame.rename(columns=acoustic_rename, inplace=True)
+
+	return text_frame, acoustic_frame
 
 
-def train(text_lr, acoustic_lr, num_epochs):
-	text_features, acoustic_features = get_data()
-	text_nparrays = np.empty((0, 51))
-	acoustic_nparrays = np.empty((0, 51))
+# Save embeddings on test fold as features
+def evaluate(text_encoder, acoustic_encoder, text_train, acoustic_train, text_test, acoustic_test, interviews_train, interviews_test):
+	diagnosis=ALZHEIMERS + CONTROL
+	diag = pd.read_sql_table(SQL_DBANK_DIAGNOSIS, cnx)
+	diag = diag[diag['diagnosis'].isin(diagnosis)]
 
+	text_frame_train, acoustic_frame_train = get_data_frames(diag, text_encoder, acoustic_encoder, text_train, acoustic_train, interviews_train)
+	text_frame_test, acoustic_frame_test = get_data_frames(diag, text_encoder, acoustic_encoder, text_test, acoustic_test, interviews_test)
+
+	text_frame_train, acoustic_frame_train = pd.merge(text_frame_train, diag), pd.merge(acoustic_frame_train, diag)
+	text_frame_test, acoustic_frame_test = pd.merge(text_frame_test, diag), pd.merge(acoustic_frame_test, diag)
+
+	y_text = ~text_frame_train.diagnosis.isin(CONTROL)
+	y_acoustic = ~acoustic_frame_train.diagnosis.isin(CONTROL)
+	assert y_text.all() == y_acoustic.all()
+	y_train = y_text
+
+	ytest_text = ~text_frame_test.diagnosis.isin(CONTROL)
+	ytest_acoustic = ~acoustic_frame_test.diagnosis.isin(CONTROL)
+	assert ytest_text.all() == ytest_acoustic.all()
+	y_test = ytest_text
+
+	drop = ['interview', 'diagnosis']
+	text_features_train, text_features_test = text_frame_train.drop(drop, axis=1, errors='ignore'), text_frame_test.drop(drop, axis=1, errors='ignore')
+	text_features_train, text_features_test = text_features_train.apply(pd.to_numeric, errors='ignore'), text_features_test.apply(pd.to_numeric, errors='ignore')
+
+	acoustic_features_train, acoustic_features_test = acoustic_frame_train.drop(drop, axis=1, errors='ignore'), acoustic_frame_test.drop(drop, axis=1, errors='ignore')
+	acoustic_features_train, acoustic_features_test = acoustic_features_train.apply(pd.to_numeric, errors='ignore'), acoustic_features_test.apply(pd.to_numeric, errors='ignore')
+
+	model_text = LogisticRegression()
+	model_acoustic = LogisticRegression()
+	model_text = model_text.fit(text_features_train, y_train)
+	model_acoustic = model_acoustic.fit(acoustic_features_train, y_train)
+	# Predict
+	yhat_text = model_text.predict(text_features_test)
+	yhat_acoustic = model_acoustic.predict(acoustic_features_test)
+
+	acc_text, fms_text = accuracy_score(y_test, yhat_text), f1_score(y_test, yhat_text)
+	acc_acoustic, fms_acoustic = accuracy_score(y_test, yhat_acoustic), f1_score(y_test, yhat_acoustic)
+
+	return acc_text, fms_text, acc_acoustic, fms_acoustic
+
+
+def train(text_features, acoustic_features, text_lr, acoustic_lr, num_epochs):
 	for idx in range(10):
 		print "Training for fold ", idx, " start!"
 		text_fold = text_features[idx]
@@ -120,6 +171,7 @@ def train(text_lr, acoustic_lr, num_epochs):
 		acoustic_train, acoustic_test = acoustic_fold["acoustic_train"], acoustic_fold["acoustic_test"]
 		acoustic_interviews = acoustic_fold["ids_test"]
 
+		assert text_fold["ids_train"].all() == acoustic_fold["ids_train"].all()
 		assert text_interviews.all() == acoustic_interviews.all()
 		interviews = text_interviews
 
@@ -168,33 +220,44 @@ def train(text_lr, acoustic_lr, num_epochs):
 					avg_loss = 0
 
 		print "Training for fold ", idx, " finish!"
-		text_nparray, acoustic_nparray = embed_test_fold(text_encoder, acoustic_encoder, text_test, acoustic_test, interviews)
+		torch.save(text_encoder.state_dict(), 'embedding/text_embedding_param_{}.pkl'.format(idx))
+		torch.save(acoustic_encoder.state_dict(), 'embedding/acoustic_embedding_param_{}.pkl'.format(idx))
 
-		text_nparrays = np.vstack((text_nparrays, text_nparray))
-		acoustic_nparrays = np.vstack((acoustic_nparrays, acoustic_nparray))
-		# torch.save(text_encoder.state_dict(), root  + 'text_embedding_param_wo_spatial.pkl')
-		# torch.save(acoustic_encoder.state_dict(), root + 'acoustic_embedding_param_wo_spatial.pkl')
-	
-	print "Saving embeddings on test fold as features..."
-	text_frame = pd.DataFrame(text_nparrays)
-	text_rename = {0: "interview"}
-	for i in range(1, 51):
-		text_rename[i] = "t%d" % i
-	text_frame.rename(columns=text_rename, inplace=True)
+def test(text_features, acoustic_features):
+	acc_scores_text = []
+	f1_scores_text = []
+	acc_scores_acoustic = []
+	f1_scores_acoustic = []
 
-	acoustic_frame = pd.DataFrame(acoustic_nparrays)
-	acoustic_rename = {0: "interview"}
-	for i in range(1, 51):
-		acoustic_rename[i] = "a%d" % i
-	acoustic_frame.rename(columns=acoustic_rename, inplace=True)
+	for idx in range(10):
+		text_fold = text_features[idx]
+		text_train, text_test = text_fold["text_train"], text_fold["text_test"]
+		acoustic_fold = acoustic_features[idx]
+		acoustic_train, acoustic_test = acoustic_fold["acoustic_train"], acoustic_fold["acoustic_test"]
 
-	text_frame.to_sql(SQL_DBANK_TEXT_EMBEDDINGS, cnx, if_exists='replace', index=False)
-	acoustic_frame.to_sql(SQL_DBANK_ACOUSTIC_EMBEDDINGS, cnx, if_exists='replace', index=False)
+		text_embedding = EmbeddingLayer(99, 50)
+		acoustic_embedding = EmbeddingLayer(172, 50)
+		text_embedding.load_state_dict(torch.load('embedding/text_embedding_param_{}.pkl'.format(idx)))
+		acoustic_embedding.load_state_dict(torch.load('embedding/acoustic_embedding_param_{}.pkl'.format(idx)))
 
-def save_embedding_features():
-	num_epochs = 1
+		acc_text, fms_text, acc_acoustic, fms_acoustic = evaluate(text_embedding, acoustic_embedding, text_train, acoustic_train, text_test, acoustic_test, text_fold["ids_train"], text_fold["ids_test"])
+		print "acc_text, fms_text, acc_acoustic, fms_acoustic for fold ", idx, " are ", acc_text, fms_text, acc_acoustic, fms_acoustic  
+		acc_scores_text.append(acc_text)
+		f1_scores_text.append(fms_text)
+		acc_scores_acoustic.append(acc_acoustic)
+		f1_scores_acoustic.append(fms_acoustic)
+
+	print "Accuracy for Embedded_L is ", np.nanmean(acc_scores_text, axis=0)
+	print "F score for Embedded_L is ", np.nanmean(f1_scores_text, axis=0)
+	print "Accuracy for Embedded_A is ", np.nanmean(acc_scores_acoustic, axis=0)
+	print "F score for Embedded_A is ", np.nanmean(f1_scores_acoustic, axis=0)
+
+
+def embedding_experiment():
+	num_epochs = 3
 	text_lr = 0.01
 	acoustic_lr = 0.01
+	text_features, acoustic_features = get_data()
 
-	train(text_lr, acoustic_lr, num_epochs)
-
+	train(text_features, acoustic_features, text_lr, acoustic_lr, num_epochs)
+	test(text_features, acoustic_features)

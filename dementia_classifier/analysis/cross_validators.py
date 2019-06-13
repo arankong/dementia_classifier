@@ -123,7 +123,6 @@ class DementiaCV(object):
         return self
 
 
-
 class BlogCV(DementiaCV):
     """BlogCV is a subclass of DementiaCV which performs a 9-fold cross validation 
     where the test fold has contains posts from blogs not in the training fold.
