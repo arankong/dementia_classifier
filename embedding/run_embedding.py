@@ -117,7 +117,6 @@ def get_data_frames(diag, text_encoder, acoustic_encoder, text, acoustic, interv
 	return text_frame, acoustic_frame
 
 
-# Save embeddings on test fold as features
 def evaluate(text_encoder, acoustic_encoder, text_train, acoustic_train, text_test, acoustic_test, interviews_train, interviews_test):
 	diagnosis=ALZHEIMERS + CONTROL
 	diag = pd.read_sql_table(SQL_DBANK_DIAGNOSIS, cnx)
@@ -126,8 +125,8 @@ def evaluate(text_encoder, acoustic_encoder, text_train, acoustic_train, text_te
 	text_frame_train, acoustic_frame_train = get_data_frames(diag, text_encoder, acoustic_encoder, text_train, acoustic_train, interviews_train)
 	text_frame_test, acoustic_frame_test = get_data_frames(diag, text_encoder, acoustic_encoder, text_test, acoustic_test, interviews_test)
 
-	text_frame_train, acoustic_frame_train = pd.merge(text_frame_train, diag), pd.merge(acoustic_frame_train, diag)
-	text_frame_test, acoustic_frame_test = pd.merge(text_frame_test, diag), pd.merge(acoustic_frame_test, diag)
+	text_frame_train, acoustic_frame_train = pd.merge(text_frame_train, diag, on=['interview']), pd.merge(acoustic_frame_train, diag, on=['interview'])
+	text_frame_test, acoustic_frame_test = pd.merge(text_frame_test, diag, on=['interview']), pd.merge(acoustic_frame_test, diag, on=['interview'])
 
 	y_text = ~text_frame_train.diagnosis.isin(CONTROL)
 	y_acoustic = ~acoustic_frame_train.diagnosis.isin(CONTROL)
@@ -139,25 +138,39 @@ def evaluate(text_encoder, acoustic_encoder, text_train, acoustic_train, text_te
 	assert ytest_text.all() == ytest_acoustic.all()
 	y_test = ytest_text
 
-	drop = ['interview', 'diagnosis']
-	text_features_train, text_features_test = text_frame_train.drop(drop, axis=1, errors='ignore'), text_frame_test.drop(drop, axis=1, errors='ignore')
+	text_frame_train, acoustic_frame_train = text_frame_train.drop(['diagnosis'], axis=1, errors='ignore'), acoustic_frame_train.drop(['diagnosis'], axis=1, errors='ignore')
+	text_frame_test, acoustic_frame_test = text_frame_test.drop(['diagnosis'], axis=1, errors='ignore'), acoustic_frame_test.drop(['diagnosis'], axis=1, errors='ignore')
+	combined_frame_train = pd.merge(text_frame_train, acoustic_frame_train, on=['interview'])
+	combined_frame_test = pd.merge(text_frame_test, acoustic_frame_test, on=['interview'])
+
+	combined_features_train = combined_frame_train.drop(['interview'], axis=1, errors='ignore')
+	combined_features_train = combined_features_train.apply(pd.to_numeric, errors='ignore')
+	combined_features_test = combined_frame_test.drop(['interview'], axis=1, errors='ignore')
+	combined_features_test = combined_features_test.apply(pd.to_numeric, errors='ignore')
+
+	text_features_train, text_features_test = text_frame_train.drop(['interview'], axis=1, errors='ignore'), text_frame_test.drop(['interview'], axis=1, errors='ignore')
 	text_features_train, text_features_test = text_features_train.apply(pd.to_numeric, errors='ignore'), text_features_test.apply(pd.to_numeric, errors='ignore')
 
-	acoustic_features_train, acoustic_features_test = acoustic_frame_train.drop(drop, axis=1, errors='ignore'), acoustic_frame_test.drop(drop, axis=1, errors='ignore')
+	acoustic_features_train, acoustic_features_test = acoustic_frame_train.drop(['interview'], axis=1, errors='ignore'), acoustic_frame_test.drop(['interview'], axis=1, errors='ignore')
 	acoustic_features_train, acoustic_features_test = acoustic_features_train.apply(pd.to_numeric, errors='ignore'), acoustic_features_test.apply(pd.to_numeric, errors='ignore')
 
-	model_text = LogisticRegression()
-	model_acoustic = LogisticRegression()
+	model_text = LogisticRegression(max_iter=1000)
+	model_acoustic = LogisticRegression(max_iter=1000)
+	model_combined = LogisticRegression(max_iter=1000)
+
 	model_text = model_text.fit(text_features_train, y_train)
 	model_acoustic = model_acoustic.fit(acoustic_features_train, y_train)
+	model_combined = model_combined.fit(combined_features_train, y_train)
+
 	# Predict
 	yhat_text = model_text.predict(text_features_test)
 	yhat_acoustic = model_acoustic.predict(acoustic_features_test)
+	yhat = model_combined.predict(combined_features_test)
 
+	acc, fms = accuracy_score(y_test, yhat), f1_score(y_test, yhat)
 	acc_text, fms_text = accuracy_score(y_test, yhat_text), f1_score(y_test, yhat_text)
 	acc_acoustic, fms_acoustic = accuracy_score(y_test, yhat_acoustic), f1_score(y_test, yhat_acoustic)
-
-	return acc_text, fms_text, acc_acoustic, fms_acoustic
+	return acc_text, fms_text, acc_acoustic, fms_acoustic, acc, fms
 
 
 def train(text_features, acoustic_features, text_lr, acoustic_lr, num_epochs):
@@ -223,11 +236,14 @@ def train(text_features, acoustic_features, text_lr, acoustic_lr, num_epochs):
 		torch.save(text_encoder.state_dict(), 'embedding/text_embedding_param_{}.pkl'.format(idx))
 		torch.save(acoustic_encoder.state_dict(), 'embedding/acoustic_embedding_param_{}.pkl'.format(idx))
 
+
 def test(text_features, acoustic_features):
 	acc_scores_text = []
 	f1_scores_text = []
 	acc_scores_acoustic = []
 	f1_scores_acoustic = []
+	acc_scores_combined = []
+	f1_scores_combined = []
 
 	for idx in range(10):
 		text_fold = text_features[idx]
@@ -240,17 +256,21 @@ def test(text_features, acoustic_features):
 		text_embedding.load_state_dict(torch.load('embedding/text_embedding_param_{}.pkl'.format(idx)))
 		acoustic_embedding.load_state_dict(torch.load('embedding/acoustic_embedding_param_{}.pkl'.format(idx)))
 
-		acc_text, fms_text, acc_acoustic, fms_acoustic = evaluate(text_embedding, acoustic_embedding, text_train, acoustic_train, text_test, acoustic_test, text_fold["ids_train"], text_fold["ids_test"])
-		print "acc_text, fms_text, acc_acoustic, fms_acoustic for fold ", idx, " are ", acc_text, fms_text, acc_acoustic, fms_acoustic  
+		acc_text, fms_text, acc_acoustic, fms_acoustic, acc, fms = evaluate(text_embedding, acoustic_embedding, text_train, acoustic_train, text_test, acoustic_test, text_fold["ids_train"], text_fold["ids_test"])
+		print "acc_text, fms_text, acc_acoustic, fms_acoustic, acc_combined, fms_combined for fold ", idx, " are ", acc_text, fms_text, acc_acoustic, fms_acoustic, acc, fms
 		acc_scores_text.append(acc_text)
 		f1_scores_text.append(fms_text)
 		acc_scores_acoustic.append(acc_acoustic)
 		f1_scores_acoustic.append(fms_acoustic)
+		acc_scores_combined.append(acc)
+		f1_scores_combined.append(fms)
 
 	print "Accuracy for Embedded_L is ", np.nanmean(acc_scores_text, axis=0)
 	print "F score for Embedded_L is ", np.nanmean(f1_scores_text, axis=0)
 	print "Accuracy for Embedded_A is ", np.nanmean(acc_scores_acoustic, axis=0)
 	print "F score for Embedded_A is ", np.nanmean(f1_scores_acoustic, axis=0)
+	print "Accuracy for Embedded_L&A is ", np.nanmean(acc_scores_combined, axis=0)
+	print "F score for Embedded_L&A is ", np.nanmean(f1_scores_combined, axis=0)
 
 
 def embedding_experiment():
